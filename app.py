@@ -1,85 +1,67 @@
-import sqlite3
+import requests
 import telebot
 from telebot import types
+from logic.kinopoisk_api import get_movie_by_name
+from logic.database import get_list_of_movies, add_movie_to_db, remove_from_db
 
 token = "token"
 
 bot=telebot.TeleBot(token)
 
-con = sqlite3.connect('db.sql')
-cur = con.cursor()
-
-cur.execute("CREATE TABLE IF NOT EXISTS movies(title TEXT,user_id TEXT,rating INT)")
-con.commit()
-con.close()
-
 @bot.message_handler(commands=['start'])
 def start_button(message):
 	markup=types.ReplyKeyboardMarkup(resize_keyboard=True)
 	list_btn=types.KeyboardButton("Мои фильмы")
-	add_btn=types.KeyboardButton("Добавить фильм")
+	find_btn=types.KeyboardButton("Найти и добавить фильм")
 	remove_btn=types.KeyboardButton("Удалить фильм")
-	markup.add(list_btn,add_btn,remove_btn)
+	markup.add(list_btn,find_btn,remove_btn)
 	bot.send_message(message.chat.id,"Выберите нужное в меню.",reply_markup=markup)
 
 @bot.message_handler(content_types="text")
 def commands(message):
 	user_id = message.from_user.id
-
 	if message.text == "Мои фильмы":
-		list_of_movies(user_id, message, "list")
-	if message.text == "Добавить фильм":
-		bot.send_message(message.chat.id,"Введите через запятую название фильма и его оценку:")
-		bot.register_next_step_handler(message,add_to_db)
+		send_list_of_movies(message, user_id, "list")
+	if message.text == "Найти и добавить фильм":
+		msg = bot.send_message(message.chat.id, "Напишите название фильма, который хотите найти:")
+		bot.register_next_step_handler(msg, search_movie)
 	if message.text == "Удалить фильм":
-		list_of_movies(user_id, message, "remove")
-		bot.register_next_step_handler(message, remove_from_db)
+		send_list_of_movies(message, user_id, "remove")
+		bot.register_next_step_handler(message, lambda m: remove_movie(m, user_id))
 
-def list_of_movies(user_id, message, handler):
+def search_movie(message):
+	query = message.text
+	try:
+		data = get_movie_by_name(query)
+		print(data)
+		if data:
+			bot.send_photo(message.chat.id, data[0], data[1])
+		msg = bot.send_message(message.chat.id, "*Напишите оценку от 1 до 10\!* 🌟", parse_mode="MarkdownV2")
+		bot.register_next_step_handler(msg, lambda m: save_rating(m, query))
+	except Exception as e:
+		bot.send_message(message.chat.id, "Ошибка получения данных")
 
-	con = sqlite3.connect('db.sql')
-	cur = con.cursor()
-	cur.execute(f"SELECT title,rating FROM movies WHERE user_id = {user_id}")
-	movies = cur.fetchall()
-	con.close()
-	if not movies:
-			bot.send_message(message.chat.id,"Нет сохранённых фильмов.")
-	else:
-		if handler == "list":
-			text = "Мои фильмы:\n"
-		elif handler == "remove":
-			text = "Напишите название удаляемого фильма:\n"
-		i = 0
-		for title,rating in movies:
-			i = i + 1 
-			text = text + f"{i}\. *{title}* \| {rating}/10\n"
-		bot.send_message(message.chat.id,text,parse_mode="MarkdownV2")
+def save_rating(message, title):
+	rating = int(message.text)
+	user_id = message.from_user.id
+	if isinstance(rating, int):
+		add_movie_to_db(title, user_id, rating)
+		bot.send_message(message.chat.id, "*Фильм успешно добавлен в базу данных\!* 💾", parse_mode="MarkdownV2")
 
-def add_to_db(message):
-	data = message.text
+def remove_movie(message, user_id):
+	query = message.text
+	try:
+		remove_from_db(query, user_id)
+		bot.send_message(message.chat.id, "*Фильм успешно удален из базы данных\!* 🗑️", parse_mode="MarkdownV2")
+	except Exception as e:
+		bot.send_message(message.chat.id, "Ошибка удаления данных")
 
-	user_id = message.from_user.id # КОСТЫЛЬ!!! надо будет найти решение
-	
-	title = data.split(',')[0]
-	rating = data.split(',')[-1].strip()
-	con = sqlite3.connect('db.sql')
-	cur = con.cursor()
-	cur.execute("INSERT INTO movies(title,user_id,rating) VALUES(?,?,?)",(title,user_id,rating))
-	con.commit()
-	con.close()
-	bot.send_message(message.chat.id,"Фильм успешно сохранён в базу данных.")
-
-def remove_from_db(message):
-	movie_title = message.text
-
-	user_id = message.from_user.id # КОСТЫЛЬ!!! надо будет найти решение
-
-	con = sqlite3.connect('db.sql')
-	cur = con.cursor()
-	cur.execute(f"DELETE FROM movies WHERE user_id = ? AND title = ?", (user_id,movie_title))
-	con.commit()
-	con.close()
-
-	bot.send_message(message.chat.id,"Фильм успешно удален из базы данных.")
+def send_list_of_movies(message, user_id, handler):
+	try:
+		data = get_list_of_movies(user_id, handler)
+		if data:
+			bot.send_message(message.chat.id, data, parse_mode="MarkdownV2")
+	except Exception as e:
+		bot.send_message(message.chat.id, "Ошибка получения данных")
 
 bot.infinity_polling()
