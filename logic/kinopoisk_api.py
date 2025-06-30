@@ -1,6 +1,6 @@
 import requests
 
-headers = {"X-API-KEY": "token"}
+headers = {"X-API-KEY": ""}
 
 def get_movie_by_name(query):
 	print(query)
@@ -19,9 +19,9 @@ def get_movie_by_name(query):
 			data = data['docs'][0]
 			title = data['name']
 			year = data['year']
-			description = f'{(data['description'])[:200]}...'
-			rating_kp = round(float(data['rating']['kp']), 1)
-			rating_imdb = data['rating']['imdb']
+			description = str(data['description'][:200]) + "..."
+			rating_kp = round(float(data['rating']['kp'])*17.17, 1)
+			rating_imdb = round(float(data['rating']['imdb'])*17.7,1)
 			photo_url = data['poster']['url']
 		else:
 			return {"error": "Фильм не найден."}
@@ -33,9 +33,7 @@ def get_movie_by_name(query):
 {description}
 
 Рейтинг: 
-{rating_kp}/10 KP
-{rating_imdb}/10 IMDB"""]
+{rating_kp}/177 KP
+{rating_imdb}/177 IMDB"""]
 
 	return result
-
-	# bot.send_message(message=message.chat.id, text="Секс", reply_markup=find_markup)

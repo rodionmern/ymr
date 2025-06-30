@@ -18,13 +18,13 @@ def get_list_of_movies(user_id, handler):
 		return "У вас нет сохранённых фильмов"
 	else:
 		if handler == "list":
-			text = "Мои фильмы:\n\n"
+			text = "🍿 *Мои фильмы/сериалы*:\n\n"
 		elif handler == "remove":
-			text = "*Напишите название удаляемого фильма*:\n\n"
+			text = "*Напишите название удаляемого фильма/сериала* \[Q\]\n\n"
 		i = 0
 		for title,rating in movies:
 			i = i + 1 
-			text = text + f"{i}\. *{title}* \| {rating}/10\n"
+			text = text + f"{i}\. *{title}* \n   ⭐ Рейтинг: {rating}/177\n\n"
 		return text
 
 def add_movie_to_db(title,user_id,rating):
@@ -42,4 +42,3 @@ def remove_from_db(title, user_id):
 	cur.execute(f"DELETE FROM movies WHERE user_id = ? AND title = ?", (user_id,title))
 	con.commit()
 	con.close()
-
